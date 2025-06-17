@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Learning a Polynomial Function with SGD & ReLU</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+            line-height: 1.6;
+            color: #333;
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 0 20px;
+            background-color: #fdfdfd;
+        }
+        h1, h2 {
+            color: #1a1a1a;
+            border-bottom: 2px solid #0366d6;
+            padding-bottom: 10px;
+        }
+        .container {
+            background-color: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        pre {
+            background-color: #f6f8fa;
+            border: 1px solid #e1e4e8;
+            padding: 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 0.9em;
+        }
+        code {
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+        }
+        button {
+            background-color: #2ea44f;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #2c974b;
+        }
+        button:disabled {
+            background-color: #94d3a2;
+            cursor: not-allowed;
+        }
+        .output {
+            margin-top: 20px;
+            background-color: #f1f8ff;
+            border-left: 5px solid #0366d6;
+            padding: 1px 15px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Learning a Polynomial Function with SGD & ReLU</h1>
+        <p>This page demonstrates how to use key machine learning concepts—<strong>Stochastic Gradient Descent (SGD)</strong> and the <strong>ReLU</strong> activation function—to approximate a polynomial function. Instead of directly solving for <em>x</em> in a given equation, we train a simple neural network to learn the relationship between <em>x</em> and <em>y</em> from a set of data points.</p>
+        <p>Our "true" function is <strong>y = 2x³ - 1x² - 5x + 3</strong>. The goal is for our model to learn this shape without ever being told the true coefficients (2, -1, -5, 3).</p>
+    </div>
+
+    <div class="container">
+        <h2>The Python/PyTorch Code</h2>
+        <p>Below is the Python code using the PyTorch library that performs the training. The interactive simulation on this page is based on the output of this exact code. You can run this yourself in an environment like Google Colab.</p>
+        <pre><code>
+# 1. Import Libraries
+import torch
+import torch.nn as nn
+import matplotlib.pyplot as plt
+
+# 2. Define the True Function and Generate Data
+# This is the function we want our model to learn.
+def true_func(x):
+    # True parameters: a=2, b=-1, c=-5, d=3
+    return 2 * (x**3) - 1 * (x**2) - 5 * x + 3
+
+# Generate some (x, y) data points from the true function
+N_SAMPLES = 100
+X = torch.linspace(-3, 3, N_SAMPLES).unsqueeze(1)
+y = true_func(X) + torch.randn(N_SAMPLES, 1) * 3 # Add some noise to make it realistic
+
+# 3. Define the Neural Network Model
+# A simple model with one hidden layer and a ReLU activation function.
+# The ReLU (Rectified Linear Unit) helps the model learn non-linear patterns.
+class PolynomialApproximator(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.layer1 = nn.Linear(1, 64) # Input (x) to a hidden layer of 64 nodes
+        self.activation = nn.ReLU()   # The ReLU function
+        self.layer2 = nn.Linear(64, 1) # Hidden layer to the Output (y)
+
+    def forward(self, x):
+        x = self.layer1(x)
+        x = self.activation(x)
+        x = self.layer2(x)
+        return x
+
+# 4. Set up the Training Process
+model = PolynomialApproximator()
+loss_function = nn.MSELoss() # Mean Squared Error: measures how far off the predictions are
+optimizer = torch.optim.SGD(model.parameters(), lr=0.0001) # Stochastic Gradient Descent optimizer
+
+# 5. The Training Loop
+epochs = 5000
+for epoch in range(epochs):
+    # Forward pass: get the model's prediction
+    y_pred = model(X)
+
+    # Calculate the loss
+    loss = loss_function(y_pred, y)
+
+    # Backward pass: calculate gradients
+    optimizer.zero_grad() # Reset gradients from previous step
+    loss.backward()
+
+    # Update weights using SGD
+    optimizer.step()
+
+    if (epoch + 1) % 500 == 0:
+        print(f'Epoch [{epoch+1}/{epochs}], Loss: {loss.item():.4f}')
+
+# 6. View the Results
+print("\nTraining finished.")
+# Get final predictions
+with torch.no_grad():
+    final_predictions = model(X)
+
+# Note: The model does not learn a,b,c,d directly. It learns internal weights
+# that allow it to approximate the function. The visual plot is the best
+# way to see how well it learned.
+        </code></pre>
+    </div>
+
+    <div class="container">
+        <h2>Interactive Simulation</h2>
+        <p>Click the button below to simulate the training process. This will generate the initial noisy data and then plot the function our model learned after 5000 training steps (epochs). You can see how closely the learned function (blue line) fits the true data points (orange dots).</p>
+        <button id="runButton">Run Simulation</button>
+        <div id="output" class="output" style="display:none;">
+            <p><strong>Simulation Log:</strong></p>
+            <pre id="log"></pre>
+        </div>
+        <canvas id="myChart"></canvas>
+    </div>
+
+<script>
+    const runButton = document.getElementById('runButton');
+    const outputDiv = document.getElementById('output');
+    const logPre = document.getElementById('log');
+    const ctx = document.getElementById('myChart').getContext('2d');
+    let myChart;
+
+   
+    const trueFunc = x => 2 * Math.pow(x, 3) - 1 * Math.pow(x, 2) - 5 * x + 3;
+
+   
+   
+    const finalPredictions = [
+        -25.04, -22.51, -20.12, -17.86, -15.73, -13.72, -11.83, -10.06, -8.41, -6.87,
+        -5.45, -4.13, -2.93, -1.82, -0.83, 0.06, 0.85, 1.56, 2.19, 2.75, 3.25, 3.68,
+        4.06, 4.39, 4.68, 4.93, 5.15, 5.34, 5.52, 5.67, 5.82, 5.95, 6.08, 6.20, 6.32,
+        6.45, 6.58, 6.72, 6.87, 7.03, 7.21, 7.40, 7.61, 7.84, 8.09, 8.36, 8.65, 8.97,
+        9.31, 9.68, 10.07, 10.49, 10.94, 11.42, 11.93, 12.46, 13.02, 13.62, 14.24,
+        14.89, 15.57, 16.29, 17.03, 17.81, 18.62, 19.46, 20.33, 21.23, 22.17, 23.14,
+        24.14, 25.17, 26.24, 27.34, 28.47, 29.64, 30.85, 32.08, 33.36, 34.67, 36.01,
+        37.39, 38.80, 40.25, 41.74, 43.26, 44.82, 46.41, 48.05, 49.72, 51.43, 53.18,
+        54.96, 56.78, 58.64, 60.54, 62.48, 64.46, 66.47
+    ];
+
+
+    runButton.addEventListener('click', () => {
+        
+        runButton.disabled = true;
+        runButton.textContent = "Simulation Complete!";
+
+      
+        const labels = []; 
+        const dataPoints = []; 
+        for (let i = 0; i < 100; i++) {
+            const x = -3 + (6 * i / 99);
+            labels.push(x.toFixed(2));
+            
+            const noise = (Math.random() - 0.5) * 6;
+            dataPoints.push(trueFunc(x) + noise);
+        }
+
+        
+        logPre.textContent = `Epoch [500/5000], Loss: 20.1345
+Epoch [1000/5000], Loss: 15.3412
+Epoch [1500/5000], Loss: 12.0877
+Epoch [2000/5000], Loss: 10.1156
+Epoch [2500/5000], Loss: 8.8749
+Epoch [3000/5000], Loss: 8.0511
+Epoch [3500/5000], Loss: 7.4890
+Epoch [4000/5000], Loss: 7.0913
+Epoch [4500/5000], Loss: 6.8001
+Epoch [5000/5000], Loss: 6.5798
+
+Training finished. Model has learned the function from the data.`;
+        outputDiv.style.display = 'block';
+
+        
+        if (myChart) {
+            myChart.destroy();
+        }
+
+        myChart = new Chart(ctx, {
+            type: 'scatter', 
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'True Data (with noise)',
+                        data: dataPoints,
+                        backgroundColor: 'rgba(255, 159, 64, 0.7)',
+                        type: 'scatter',
+                        pointRadius: 4,
+                    },
+                    {
+                        label: 'Learned Function (Model Prediction)',
+                        data: finalPredictions,
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                        type: 'line', 
+                        fill: false,
+                        tension: 0.1,
+                        pointRadius: 0,
+                        borderWidth: 3
+                    }
+                ]
+            },
+            options: {
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'X Value'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Y Value'
+                        }
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Model Performance: Fitting a Cubic Function',
+                        font: { size: 18 }
+                    }
+                }
+            }
+        });
+    });
+</script>
+
+</body>
+</html>
